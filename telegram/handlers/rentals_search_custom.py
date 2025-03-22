@@ -4,6 +4,7 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
 from telegram_db.db import AsyncSessionLocal
 from telegram_db.models import Apartment
 from telegram.states import Form

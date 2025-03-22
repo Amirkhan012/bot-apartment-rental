@@ -8,7 +8,6 @@ from telegram_db.db import AsyncSessionLocal
 
 
 router = Router()
-
 PAGE_SIZE = 5
 
 

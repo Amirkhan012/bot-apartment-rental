@@ -37,8 +37,8 @@ async def create_apartment(
     Возвращает:
       Apartment: Объект объявления, сохраненный в базе данных.
     """
-    if photo_file_ids and len(photo_file_ids) > 50:
-        raise ValueError("Можно загрузить максимум 50 фотографий.")
+    if photo_file_ids and len(photo_file_ids) > 15:
+        raise ValueError("Можно загрузить максимум 15 фотографий.")
 
     async with AsyncSessionLocal() as session:
         new_apartment = Apartment(

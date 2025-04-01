@@ -80,6 +80,7 @@ async def get_apartments_by_owner(owner_id: str) -> list[Apartment]:
             select(Apartment)
             .where(Apartment.owner_id == owner_id)
             .options(selectinload(Apartment.photos))
+            .order_by(Apartment.id)
         )
         result = await session.execute(stmt)
         apartments = result.scalars().all()

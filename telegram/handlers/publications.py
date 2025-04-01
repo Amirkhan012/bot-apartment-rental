@@ -14,12 +14,23 @@ PAGE_SIZE = 5
 @router.message(F.text == "📃 Мои публикации")
 async def my_publications(message: types.Message, state: FSMContext) -> None:
     """
-    Обработчик кнопки "📃 Мои публикации".
-    Извлекает публикации для текущего пользователя из базы данных
-    и выводит их красиво, с информацией и группами фотографий по 5 штук.
+    Обработчик команды «Мои публикации».
+    Инициализирует текущую страницу и показывает публикации пользователя.
     """
-    owner_id = str(message.from_user.id)
+    await state.update_data(current_publications_page=0)
+    await show_user_publications(message, state, user_id=message.from_user.id)
 
+
+async def show_user_publications(
+    message: types.Message,
+    state: FSMContext,
+    user_id: int
+) -> None:
+    """
+    Извлекает публикации пользователя по user_id, делит их на страницы и
+    отправляет сообщения.
+    """
+    owner_id = str(user_id)
     apartments = await get_apartments_by_owner(owner_id)
 
     if not apartments:
@@ -49,7 +60,7 @@ async def my_publications(message: types.Message, state: FSMContext) -> None:
 
         if apt.photos:
             photo_ids = [photo.file_id for photo in apt.photos]
-            chunks = [photo_ids[i:i+5] for i in range(0, len(photo_ids), 5)]
+            chunks = [photo_ids[i:i + 5] for i in range(0, len(photo_ids), 5)]
             for chunk in chunks:
                 media = [
                     types.InputMediaPhoto(media=file_id) for file_id in chunk]
@@ -58,15 +69,11 @@ async def my_publications(message: types.Message, state: FSMContext) -> None:
 
         action_kb = InlineKeyboardBuilder()
         action_kb.button(
-            text="❌ Удалить",
-            callback_data=f"delete|{apt.id}")
+            text="❌ Удалить", callback_data=f"delete|{apt.id}")
         action_kb.button(
-            text="🔄 Изменить статус",
-            callback_data=f"toggle|{apt.id}")
+            text="🔄 Изменить статус", callback_data=f"toggle|{apt.id}")
         action_kb.adjust(2)
-        await message.answer(
-            response,
-            reply_markup=action_kb.as_markup())
+        await message.answer(response, reply_markup=action_kb.as_markup())
 
     nav_kb = InlineKeyboardBuilder()
     if current_page > 0:
@@ -75,39 +82,35 @@ async def my_publications(message: types.Message, state: FSMContext) -> None:
         nav_kb.button(text="➡️ Далее", callback_data="pubs_next")
     nav_kb.adjust(1)
     if nav_kb.buttons:
-        await message.answer(
-            f"Страница {current_page+1} из {total_pages}",
-            reply_markup=nav_kb.as_markup())
+        await message.answer(f"Страница {current_page + 1} из {total_pages}",
+                             reply_markup=nav_kb.as_markup())
 
     await state.update_data(current_publications_page=current_page)
 
 
-@router.callback_query(F.data.startswith("pubs_"))
+@router.callback_query(F.data.in_(["pubs_next", "pubs_prev"]))
 async def publications_pagination(
     callback: types.CallbackQuery,
     state: FSMContext
 ) -> None:
     """
-    Обрабатывает навигацию по страницам публикаций.
-    Кнопки "⬅️ Назад" и "➡️ Далее" изменяют номер текущей страницы.
+    Обработчик нажатий на кнопки навигации. Обновляет номер страницы и
+    вызывает отображение публикаций.
     """
-    data = callback.data
-    user_data = await state.get_data()
-    current_page = user_data.get("current_publications_page", 0)
+    data = await state.get_data()
+    current_page = data.get("current_publications_page", 0)
+    user_id = callback.from_user.id
 
-    owner_id = str(callback.from_user.id)
-    async with AsyncSessionLocal() as session:
-        apartments = await get_apartments_by_owner(session, owner_id)
+    apartments = await get_apartments_by_owner(str(user_id))
     total_pages = (len(apartments) - 1) // PAGE_SIZE + 1
 
-    if data == "pubs_next" and current_page < total_pages - 1:
+    if callback.data == "pubs_next" and current_page < total_pages - 1:
         current_page += 1
-    elif data == "pubs_prev" and current_page > 0:
+    elif callback.data == "pubs_prev" and current_page > 0:
         current_page -= 1
 
     await state.update_data(current_publications_page=current_page)
-
-    await my_publications(callback.message, state)
+    await show_user_publications(callback.message, state, user_id=user_id)
     await callback.answer()
 
 
